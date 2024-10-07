@@ -16,17 +16,17 @@ export default function PlayerHand({ cards, score }: PlayerHandProps) {
           {cards.map((card, index) => (
             <motion.div
               key={`${card.suit}-${card.face}-${index}`}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
+              initial={{ opacity: 0, scale: 0.8, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -50 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card className="w-16 h-24 flex items-center justify-center p-1 shrink-0">
+              <Card className="w-24 h-36 flex items-center justify-center p-1 shrink-0">
                 <Image
                   src={card.image}
                   alt={`${card.face} of ${card.suit}`}
-                  width={56}
-                  height={84}
+                  width={90}
+                  height={98}
                   className="object-contain"
                 />
               </Card>

@@ -26,7 +26,7 @@ export default function DealerHand({ cards, score, revealHidden }: DealerHandPro
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <Card className="w-16 h-24 flex items-center justify-center p-1 shrink-0">
+              <Card className="w-24 h-36 flex items-center justify-center p-1 shrink-0">
                 <AnimatePresence>
                   {(index !== 0 || revealHidden) ? (
                     <motion.div
@@ -39,8 +39,8 @@ export default function DealerHand({ cards, score, revealHidden }: DealerHandPro
                       <Image
                         src={card.image}
                         alt={`${card.face} of ${card.suit}`}
-                        width={56}
-                        height={84}
+                        width={90}
+                        height={98}
                         className="object-contain"
                       />
                     </motion.div>
@@ -55,8 +55,8 @@ export default function DealerHand({ cards, score, revealHidden }: DealerHandPro
                       <Image
                         src="/assets/images/back_of_card.png"
                         alt="Card back"
-                        width={56}
-                        height={84}
+                        width={90}
+                        height={98}
                         className="object-contain"
                       />
                     </motion.div>
