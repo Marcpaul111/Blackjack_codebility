@@ -50,7 +50,7 @@ export const gameSlice = createSlice({
       state.playerCards = [state.deck.pop()!, state.deck.pop()!]
       state.dealerCards = [state.deck.pop()!, state.deck.pop()!]
       state.dealerScore = calculateScore(state.dealerCards)
-      state.playerScore = 0 // We'll calculate this after handling Aces
+      state.playerScore = calculateInitialScore(state.playerCards)
       state.playerStanding = false
       state.dealerStanding = false
       state.gameStarted = true
@@ -118,6 +118,30 @@ export const gameSlice = createSlice({
     },
   },
 })
+
+function calculateInitialScore(cards: Card[]): number {
+  let score = 0
+  let aces = 0
+
+  for (const card of cards) {
+    if (card.face === 'ace') {
+      aces += 1
+    } else {
+      score += checkCard(card, 0)
+    }
+  }
+
+  // For initial score, we'll count Aces as 11 if it doesn't bust, otherwise as 1
+  for (let i = 0; i < aces; i++) {
+    if (score + 11 <= 21) {
+      score += 11
+    } else {
+      score += 1
+    }
+  }
+
+  return score
+}
 
 function calculateScore(cards: Card[], wants11: number = 0): number {
   let score = 0
