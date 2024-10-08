@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { gameSlice } from '@/store/gameSlice'
 import { RootState } from '@/store/store'
 
@@ -16,21 +17,38 @@ export default function BettingDialog({ isOpen, onClose }: BettingDialogProps) {
   const dispatch = useDispatch()
   const { wallet } = useSelector((state: RootState) => state.game)
   const [selectedBet, setSelectedBet] = useState(10)
+  const [customBet, setCustomBet] = useState('')
 
   const handleBet = (amount: number) => {
     if (wallet >= amount) {
       setSelectedBet(amount)
+      setCustomBet('')
     }
   }
 
+  const handleCustomBet = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    if (/^\d*$/.test(value)) {
+      setCustomBet(value)
+      setSelectedBet(Number(value) || 0)
+    }
+  }
+
+  const handleAllIn = () => {
+    setSelectedBet(wallet)
+    setCustomBet(wallet.toString())
+  }
+
   const handleStartGame = () => {
-    dispatch(gameSlice.actions.SET_BET(selectedBet))
-    dispatch(gameSlice.actions.START_GAME())
-    onClose()
+    if (selectedBet > 0 && selectedBet <= wallet) {
+      dispatch(gameSlice.actions.SET_BET(selectedBet))
+      dispatch(gameSlice.actions.START_GAME())
+      onClose()
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Place Your Bet</DialogTitle>
@@ -60,7 +78,18 @@ export default function BettingDialog({ isOpen, onClose }: BettingDialogProps) {
               $100
             </Button>
           </div>
-          <Button onClick={handleStartGame}>Start Game</Button>
+          <div className="flex items-center space-x-2 w-1/3 justify-self-center">
+            <Input
+              type="text"
+              placeholder="Custom bet"
+              value={customBet}
+              onChange={handleCustomBet}
+            />
+          </div>
+          <Button className="w-1/2 justify-self-center" onClick={handleAllIn}>All In</Button>
+          <Button onClick={handleStartGame} disabled={selectedBet === 0 || selectedBet > wallet}>
+            Start Game
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

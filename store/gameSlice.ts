@@ -22,6 +22,9 @@ interface GameState {
   gameStarted: boolean
   lastDrawnCard: Card | null
   acesToHandle: Card[]
+  playerAceValues: number[]
+  playerBust: boolean
+  playerBlackjack: boolean
 }
 
 const initialState: GameState = {
@@ -38,6 +41,9 @@ const initialState: GameState = {
   gameStarted: false,
   lastDrawnCard: null,
   acesToHandle: [],
+  playerAceValues: [],
+  playerBust: false,
+  playerBlackjack: false,
 }
 
 export const gameSlice = createSlice({
@@ -45,17 +51,29 @@ export const gameSlice = createSlice({
   initialState,
   reducers: {
     START_GAME: (state) => {
-      state.winner = null
-      state.deck = createDeck()
-      state.playerCards = [state.deck.pop()!, state.deck.pop()!]
-      state.dealerCards = [state.deck.pop()!, state.deck.pop()!]
-      state.dealerScore = calculateScore(state.dealerCards)
-      state.playerScore = calculateInitialScore(state.playerCards)
-      state.playerStanding = false
-      state.dealerStanding = false
-      state.gameStarted = true
-      state.lastDrawnCard = null
-      state.acesToHandle = state.playerCards.filter(card => card.face === 'ace')
+      if (state.playerBet > 0) {
+        state.winner = null
+        state.deck = createDeck()
+        state.playerCards = [state.deck.pop()!, state.deck.pop()!]
+        state.dealerCards = [state.deck.pop()!, state.deck.pop()!]
+        state.dealerScore = calculateScore(state.dealerCards)
+        state.playerScore = calculateInitialScore(state.playerCards)
+        state.playerStanding = false
+        state.dealerStanding = false
+        state.gameStarted = true
+        state.lastDrawnCard = null
+        state.acesToHandle = state.playerCards.filter(card => card.face === 'ace')
+        state.playerAceValues = []
+        state.playerBust = false
+        state.playerBlackjack = state.playerScore === 21
+        if (state.playerBlackjack) {
+          state.winner = 'Player'
+          state.wallet += Math.floor(state.playerBet * 2.5) // Blackjack typically pays 3:2
+        }
+      }
+    },
+    RESET_GAME: (state) => {
+      Object.assign(state, {...initialState, wallet: state.wallet})
     },
     SET_BET: (state, action: PayloadAction<number>) => {
       if (state.wallet >= action.payload) {
@@ -65,16 +83,28 @@ export const gameSlice = createSlice({
     },
     UPDATE_SCORE: (state, action: PayloadAction<{ player: boolean; wants11: number }>) => {
       if (action.payload.player) {
-        state.playerScore = calculateScore(state.playerCards, action.payload.wants11)
+        state.playerAceValues.push(action.payload.wants11)
+        state.playerScore = calculateScore(state.playerCards, state.playerAceValues)
         if (state.acesToHandle.length > 0) {
-          state.acesToHandle.pop() // Remove the Ace we just handled
+          state.acesToHandle.pop()
+        }
+        if (state.playerScore > 21) {
+          state.playerBust = true
+          state.winner = 'Dealer'
+        } else if (state.playerScore === 21) {
+          state.playerBlackjack = true
+          state.winner = 'Player'
+          state.wallet += Math.floor(state.playerBet * 2.5) // Blackjack typically pays 3:2
         }
       } else {
         state.dealerScore = calculateScore(state.dealerCards)
       }
     },
     DETERMINE_WINNER: (state) => {
-      if (state.playerScore > 21) {
+      if (state.playerBlackjack) {
+        state.winner = 'Player'
+        state.wallet += Math.floor(state.playerBet * 2.5) // Blackjack typically pays 3:2
+      } else if (state.playerBust || state.playerScore > 21) {
         state.winner = 'Dealer'
       } else if (state.dealerScore > 21) {
         state.winner = 'Player'
@@ -92,6 +122,7 @@ export const gameSlice = createSlice({
       }
       if (state.winner) {
         state.gameStarted = false
+        state.playerBet = 0
       }
     },
     PLAYER_HIT: (state) => {
@@ -101,7 +132,15 @@ export const gameSlice = createSlice({
       if (newCard.face === 'ace') {
         state.acesToHandle.push(newCard)
       } else {
-        state.playerScore = calculateScore(state.playerCards)
+        state.playerScore = calculateScore(state.playerCards, state.playerAceValues)
+        if (state.playerScore > 21) {
+          state.playerBust = true
+          state.winner = 'Dealer'
+        } else if (state.playerScore === 21) {
+          state.playerBlackjack = true
+          state.winner = 'Player'
+          state.wallet += Math.floor(state.playerBet * 2.5) // Blackjack typically pays 3:2
+        }
       }
     },
     SET_PLAYER_STANDING: (state, action: PayloadAction<boolean>) => {
@@ -110,7 +149,8 @@ export const gameSlice = createSlice({
     DEALER_TURN: (state, action: PayloadAction<boolean>) => {
       if (action.payload) {
         while (state.dealerScore < 17) {
-          state.dealerCards.push(state.deck.pop()!)
+          const newCard = state.deck.pop()!
+          state.dealerCards.push(newCard)
           state.dealerScore = calculateScore(state.dealerCards)
         }
         state.dealerStanding = true
@@ -131,7 +171,6 @@ function calculateInitialScore(cards: Card[]): number {
     }
   }
 
-  // For initial score, we'll count Aces as 11 if it doesn't bust, otherwise as 1
   for (let i = 0; i < aces; i++) {
     if (score + 11 <= 21) {
       score += 11
@@ -143,7 +182,7 @@ function calculateInitialScore(cards: Card[]): number {
   return score
 }
 
-function calculateScore(cards: Card[], wants11: number = 0): number {
+function calculateScore(cards: Card[], aceValues: number[] = []): number {
   let score = 0
   let aces = 0
 
@@ -156,8 +195,8 @@ function calculateScore(cards: Card[], wants11: number = 0): number {
   }
 
   for (let i = 0; i < aces; i++) {
-    if (i === aces - 1 && wants11 === 11 && score + 11 <= 21) {
-      score += 11
+    if (i < aceValues.length) {
+      score += aceValues[i]
     } else if (score + 11 <= 21) {
       score += 11
     } else {
@@ -170,6 +209,7 @@ function calculateScore(cards: Card[], wants11: number = 0): number {
 
 export const {
   START_GAME,
+  RESET_GAME,
   SET_BET,
   UPDATE_SCORE,
   DETERMINE_WINNER,

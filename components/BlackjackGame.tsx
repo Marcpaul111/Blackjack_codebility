@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -25,40 +25,62 @@ export default function BlackjackGame() {
     gameStarted,
     playerStanding,
     lastDrawnCard,
-    acesToHandle
+    acesToHandle,
+    playerBust,
+    playerBlackjack
   } = useSelector((state: RootState) => state.game)
 
   const [isAceDialogOpen, setIsAceDialogOpen] = useState(false)
   const [isBettingDialogOpen, setIsBettingDialogOpen] = useState(true)
   const [revealDealerCard, setRevealDealerCard] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
-    if (playerStanding || winner) {
+    audioRef.current = new Audio('/assets/SlidingCard3.mp3')
+  }, [])
+
+  useEffect(() => {
+    if (playerStanding || winner || playerBust || playerBlackjack) {
       setRevealDealerCard(true)
     }
-  }, [playerStanding, winner])
+  }, [playerStanding, winner, playerBust, playerBlackjack])
 
   useEffect(() => {
     if (acesToHandle.length > 0) {
       setIsAceDialogOpen(true)
-    } else if (gameStarted && !winner) {
+    } else if (gameStarted && !winner && !playerBust && !playerBlackjack) {
       dispatch(gameSlice.actions.DETERMINE_WINNER())
     }
-  }, [acesToHandle, gameStarted, winner, dispatch])
+  }, [acesToHandle, gameStarted, winner, playerBust, playerBlackjack, dispatch])
+
+  useEffect(() => {
+    if (playerStanding) {
+      dispatch(gameSlice.actions.DEALER_TURN(true))
+      dispatch(gameSlice.actions.DETERMINE_WINNER())
+    }
+  }, [playerStanding, dispatch])
+
+  useEffect(() => {
+    if (gameStarted) {
+      setIsBettingDialogOpen(false)
+    }
+  }, [gameStarted])
 
   const handleHit = () => {
+    if (audioRef.current) {
+      audioRef.current.play()
+    }
     dispatch(gameSlice.actions.PLAYER_HIT())
   }
 
   const handleStand = () => {
     dispatch(gameSlice.actions.SET_PLAYER_STANDING(true))
-    dispatch(gameSlice.actions.DEALER_TURN(true))
-    dispatch(gameSlice.actions.DETERMINE_WINNER())
   }
 
   const handleNewGame = () => {
     setIsBettingDialogOpen(true)
     setRevealDealerCard(false)
+    dispatch(gameSlice.actions.RESET_GAME())
   }
 
   const handleAceDialogClose = (wants11: number) => {
@@ -67,8 +89,7 @@ export default function BlackjackGame() {
   }
 
   const handleBettingDialogClose = () => {
-    setIsBettingDialogOpen(false)
-    dispatch(gameSlice.actions.START_GAME())
+    // This function is now empty as we're controlling the dialog visibility based on gameStarted state
   }
 
   return (
@@ -79,24 +100,34 @@ export default function BlackjackGame() {
         <div>Bet: ${playerBet}</div>
       </div>
       <AnimatePresence>
-        <DealerHand cards={dealerCards} score={dealerScore} revealHidden={revealDealerCard} />
-        <PlayerHand cards={playerCards} score={playerScore} />
+        {gameStarted && (
+          <>
+            <DealerHand cards={dealerCards} score={dealerScore} revealHidden={revealDealerCard} />
+            <PlayerHand cards={playerCards} score={playerScore} />
+          </>
+        )}
       </AnimatePresence>
-      {gameStarted && !winner && (
+      {gameStarted && !winner && !playerStanding && !playerBust && !playerBlackjack && (
         <div className="flex justify-center space-x-4">
           <Button onClick={handleHit}>Hit</Button>
           <Button onClick={handleStand}>Stand</Button>
         </div>
       )}
-      {winner && (
+      {(winner || playerBust || playerBlackjack) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
           <h2 className="text-2xl font-bold mb-4">
-            {winner === 'push' ? "It's a tie!" : `${winner} wins!`}
+            {playerBust ? "Bust! Dealer wins!" : 
+             playerBlackjack ? "Blackjack! You win!" :
+             winner === 'push' ? "It's a tie!" : 
+             `${winner} wins!`}
           </h2>
+          <p className="mb-4">
+            Final Scores - Player: {playerScore}, Dealer: {dealerScore}
+          </p>
           <Button onClick={handleNewGame}>New Game</Button>
         </motion.div>
       )}
