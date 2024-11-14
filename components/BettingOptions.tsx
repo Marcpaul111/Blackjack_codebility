@@ -1,20 +1,16 @@
-'use client'
-
 import { useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector } from 'react-redux'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { gameSlice } from '@/store/gameSlice'
 import { RootState } from '@/store/store'
 
 interface BettingDialogProps {
   isOpen: boolean
-  onClose: () => void
+  onClose: (betAmount: number) => void
 }
 
 export default function BettingDialog({ isOpen, onClose }: BettingDialogProps) {
-  const dispatch = useDispatch()
   const { wallet } = useSelector((state: RootState) => state.game)
   const [selectedBet, setSelectedBet] = useState(10)
   const [customBet, setCustomBet] = useState('')
@@ -41,9 +37,7 @@ export default function BettingDialog({ isOpen, onClose }: BettingDialogProps) {
 
   const handleStartGame = () => {
     if (selectedBet > 0 && selectedBet <= wallet) {
-      dispatch(gameSlice.actions.SET_BET(selectedBet))
-      dispatch(gameSlice.actions.START_GAME())
-      onClose()
+      onClose(selectedBet)
     }
   }
 

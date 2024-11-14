@@ -1,138 +1,188 @@
-'use client'
+"use client";
 
-import { useEffect, useState, useRef } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { RootState } from '@/store/store'
-import { gameSlice } from '@/store/gameSlice'
-import PlayerHand from './PlayerHand'
-import DealerHand from './DealerHand'
-import AceDialog from './AceDialog'
-import BettingDialog from './BettingOptions'
+import { useEffect, useState } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import BettingDialog from "./BettingOptions";
+import DealerHand from "./DealerHand";
+import PlayerHand from "./PlayerHand";
+import {
+  START_GAME,
+  RESET_GAME,
+  RESET_GAME_WITH_INITIAL_WALLET,
+  CHECK_BLACKJACK,
+  DETERMINE_WINNER,
+  PLAYER_HIT,
+  SET_PLAYER_STANDING,
+  DEALER_TURN,
+  SET_BET,
+} from "@/store/gameSlice";
+import { RootState } from "@/store/store";
 
 export default function BlackjackGame() {
-  const dispatch = useDispatch()
-  const { 
-    playerCards, 
-    dealerCards, 
-    playerScore, 
-    dealerScore, 
-    winner, 
-    wallet, 
-    playerBet,
-    gameStarted,
-    playerStanding,
-    lastDrawnCard,
-    acesToHandle,
-    playerBust,
-    playerBlackjack
-  } = useSelector((state: RootState) => state.game)
-
-  const [isAceDialogOpen, setIsAceDialogOpen] = useState(false)
-  const [isBettingDialogOpen, setIsBettingDialogOpen] = useState(true)
-  const [revealDealerCard, setRevealDealerCard] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const dispatch = useDispatch();
+  const game = useSelector((state: RootState) => state.game);
+  const [isBettingDialogOpen, setIsBettingDialogOpen] = useState(false);
+  const [isWinnerVisible, setIsWinnerVisible] = useState(false);
 
   useEffect(() => {
-    audioRef.current = new Audio('/assets/SlidingCard3.mp3')
-  }, [])
+    console.log("Game state:", game);
+  }, [game]);
 
   useEffect(() => {
-    if (playerStanding || winner || playerBust || playerBlackjack) {
-      setRevealDealerCard(true)
+    if (game.gameStarted) {
+      console.log("Game started, checking for blackjack");
+      dispatch(CHECK_BLACKJACK());
     }
-  }, [playerStanding, winner, playerBust, playerBlackjack])
+  }, [game.gameStarted, dispatch]);
 
   useEffect(() => {
-    if (acesToHandle.length > 0) {
-      setIsAceDialogOpen(true)
-    } else if (gameStarted && !winner && !playerBust && !playerBlackjack) {
-      dispatch(gameSlice.actions.DETERMINE_WINNER())
+    if (game.playerStanding || game.playerBust || game.playerBlackjack) {
+      console.log("Player turn ended, starting dealer turn");
+      dispatch(DEALER_TURN());
+      setTimeout(() => {
+        dispatch(DETERMINE_WINNER());
+        setIsWinnerVisible(true);
+      }, 2000);
     }
-  }, [acesToHandle, gameStarted, winner, playerBust, playerBlackjack, dispatch])
+  }, [game.playerStanding, game.playerBust, game.playerBlackjack, dispatch]);
 
-  useEffect(() => {
-    if (playerStanding) {
-      dispatch(gameSlice.actions.DEALER_TURN(true))
-      dispatch(gameSlice.actions.DETERMINE_WINNER())
-    }
-  }, [playerStanding, dispatch])
+  const handleStartGame = () => {
+    console.log("Opening betting dialog");
+    setIsBettingDialogOpen(true);
+  };
 
-  useEffect(() => {
-    if (gameStarted) {
-      setIsBettingDialogOpen(false)
-    }
-  }, [gameStarted])
+  const handleBetPlaced = (betAmount: number) => {
+    console.log("Bet placed:", betAmount);
+    dispatch(SET_BET(betAmount));
+    dispatch(START_GAME());
+    setIsBettingDialogOpen(false);
+  };
 
   const handleHit = () => {
-    if (audioRef.current) {
-      audioRef.current.play()
-    }
-    dispatch(gameSlice.actions.PLAYER_HIT())
-  }
+    console.log("Player hit");
+    dispatch(PLAYER_HIT());
+  };
 
   const handleStand = () => {
-    dispatch(gameSlice.actions.SET_PLAYER_STANDING(true))
-  }
+    console.log("Player stand");
+    dispatch(SET_PLAYER_STANDING(true));
+  };
 
   const handleNewGame = () => {
-    setIsBettingDialogOpen(true)
-    setRevealDealerCard(false)
-    dispatch(gameSlice.actions.RESET_GAME())
-  }
+    console.log("Starting new game");
+    dispatch(RESET_GAME());
+    setIsBettingDialogOpen(true);
+  };
 
-  const handleAceDialogClose = (wants11: number) => {
-    setIsAceDialogOpen(false)
-    dispatch(gameSlice.actions.UPDATE_SCORE({ player: true, wants11 }))
-  }
+  const handleResetWallet = () => {
+    console.log("Resetting wallet");
+    dispatch(RESET_GAME_WITH_INITIAL_WALLET());
+    setIsBettingDialogOpen(true);
+  };
 
-  const handleBettingDialogClose = () => {
-    // This function is now empty as we're controlling the dialog visibility based on gameStarted state
-  }
+  const isGameOver = game.winner !== null;
+  const isOutOfMoney = game.wallet === 0;
+
+  const gameResult = game.winner;
+
+  useEffect(() => {
+    console.log("Winner updated:", game.winner);
+  }, [game.winner]);
+  const getGameOutcomeMessage = () => {
+    if (game.playerBust) {
+      return "Player Busts! Dealer Wins";
+    } else if (game.dealerScore && game.playerScore > 21) {
+      return "Player Busts!";
+    } else if (game.dealerScore > 21 && game.playerScore < 21) {
+      return "Dealer Busts!";
+    } else if (game.playerScore == 21) {
+      return "Blackjack!";
+    } else if (game.dealerScore == 21) {
+      return "Blackjack!";
+    } else if (game.winner === "push") {
+      return "It's a Push";
+    }
+    return "";
+  };
 
   return (
-    <Card className="w-full max-w-2xl p-6 space-y-6">
-      <h1 className="text-3xl font-bold text-center">Blackjack</h1>
-      <div className="flex justify-between">
-        <div>Wallet: ${wallet}</div>
-        <div>Bet: ${playerBet}</div>
-      </div>
-      <AnimatePresence>
-        {gameStarted && (
-          <>
-            <DealerHand cards={dealerCards} score={dealerScore} revealHidden={revealDealerCard} />
-            <PlayerHand cards={playerCards} score={playerScore} />
-          </>
-        )}
-      </AnimatePresence>
-      {gameStarted && !winner && !playerStanding && !playerBust && !playerBlackjack && (
-        <div className="flex justify-center space-x-4">
-          <Button onClick={handleHit}>Hit</Button>
-          <Button onClick={handleStand}>Stand</Button>
-        </div>
-      )}
-      {(winner || playerBust || playerBlackjack) && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <h2 className="text-2xl font-bold mb-4">
-            {playerBust ? "Bust! Dealer wins!" : 
-             playerBlackjack ? "Blackjack! You win!" :
-             winner === 'push' ? "It's a tie!" : 
-             `${winner} wins!`}
-          </h2>
-          <p className="mb-4">
-            Final Scores - Player: {playerScore}, Dealer: {dealerScore}
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4 text-center text-white">
+        Blackjack
+      </h1>
+      <Card className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <p className="text-2xl">
+            Wallet: <span className="font-bold">${game.wallet}</span>
           </p>
-          <Button onClick={handleNewGame}>New Game</Button>
-        </motion.div>
-      )}
-      <AceDialog isOpen={isAceDialogOpen} onClose={handleAceDialogClose} />
-      <BettingDialog isOpen={isBettingDialogOpen} onClose={handleBettingDialogClose} />
-    </Card>
-  )
+          <p className="text-2xl">
+            Current Bet: <span className="font-bold">${game.playerBet}</span>
+          </p>
+        </div>
+        {game.gameStarted ? (
+          <>
+            <DealerHand
+              cards={game.dealerCards}
+              score={game.dealerScore}
+              revealHidden={
+                game.playerStanding || game.playerBust || game.playerBlackjack
+              }
+            />
+            <PlayerHand cards={game.playerCards} score={game.playerScore} />
+            <div className="flex justify-center space-x-4">
+              <Button
+                onClick={handleHit}
+                disabled={
+                  game.playerStanding || game.playerBust || game.playerBlackjack
+                }
+              >
+                Hit
+              </Button>
+              <Button
+                onClick={handleStand}
+                disabled={
+                  game.playerStanding || game.playerBust || game.playerBlackjack
+                }
+              >
+                Stand
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex justify-center">
+            <Button onClick={handleStartGame} disabled={isOutOfMoney}>
+              Start Game
+            </Button>
+          </div>
+        )}
+
+        {isGameOver && (
+          <div className="text-center">
+            <p className="text-2xl font-bold mb-4">{getGameOutcomeMessage()}</p>
+            <p className="mb-4">
+              Final Scores - Player: {game.playerScore}, Dealer:
+              {game.dealerScore}
+            </p>
+            <p className="text-2xl font-bold mb-4">
+              {game.winner === "player"
+                ? "You Win!"
+                : game.winner === "dealer"
+                ? "Dealer Wins"
+                : "Push"}
+            </p>
+            <div className="space-x-4">
+              {(isGameOver || isOutOfMoney) && (
+                <Button onClick={handleResetWallet} disabled={game.wallet > 0}>
+                  Reset Wallet
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+      <BettingDialog isOpen={isBettingDialogOpen} onClose={handleBetPlaced} />
+    </div>
+  );
 }
